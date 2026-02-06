@@ -1,10 +1,15 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
-	"os"
 )
+
+// 嵌入 heroList.json 文件
+//
+//go:embed herolist.json
+var heroListData []byte
 
 // 1. 创建英雄映射结构
 type HeroInfo struct {
@@ -17,22 +22,17 @@ type HeroInfo struct {
 var heroMap map[int]HeroInfo
 var heroMapLoaded bool = false
 
-// 2. 加载英雄列表函数
+// 2. 加载英雄列表函数（从嵌入数据加载）
 func loadHeroList() error {
 	if heroMapLoaded {
 		return nil
 	}
 
-	// 读取 heroList.json 文件
-	content, err := os.ReadFile("heroList.json")
-	if err != nil {
-		fmt.Printf("❌ 读取 heroList.json 失败: %v\n", err)
-		return err
-	}
-
 	var heroes []HeroInfo
-	if err := json.Unmarshal(content, &heroes); err != nil {
-		fmt.Printf("❌ 解析 heroList.json 失败: %v\n", err)
+	if err := json.Unmarshal(heroListData, &heroes); err != nil {
+		fmt.Printf("❌ 解析英雄列表失败: %v\n", err)
+		heroMap = make(map[int]HeroInfo)
+		heroMapLoaded = true
 		return err
 	}
 
@@ -43,61 +43,34 @@ func loadHeroList() error {
 	}
 
 	heroMapLoaded = true
-	fmt.Printf("✅ 已加载 %d 个英雄信息\n", len(heroMap))
 	return nil
 }
 
-// 3. 获取英雄名称函数（替换原来的 getHeroName）
+// 3. 获取英雄名称函数
 func getHeroName(heroId int) string {
-	// 先尝试加载英雄列表
 	if err := loadHeroList(); err != nil {
-		// 加载失败时使用备用映射
-		return getHeroNameFallback(heroId)
+		return fmt.Sprintf("未知英雄(%d)", heroId)
 	}
 
 	if hero, exists := heroMap[heroId]; exists {
 		return hero.Cname
 	}
 
-	// 没找到时返回备用名称
-	return getHeroNameFallback(heroId)
-}
-
-// 4. 备用映射（当json文件读取失败时使用）
-func getHeroNameFallback(heroId int) string {
-	fallbackMap := map[int]string{
-		505: "瑶",
-		155: "马可波罗",
-		196: "诸葛亮",
-		119: "干将莫邪",
-		184: "蔡文姬",
-		503: "海月",
-		117: "钟无艳",
-		585: "元流之子(辅助)",
-		188: "大禹",
-		// 可以继续添加更多
-	}
-
-	if name, exists := fallbackMap[heroId]; exists {
-		return name
-	}
 	return fmt.Sprintf("未知英雄(%d)", heroId)
 }
 
-// 5. 新增：获取英雄详细信息（供前端使用）
+// 4. 获取英雄详细信息
 func (a *App) GetHeroInfo(heroId int) map[string]interface{} {
 	if err := loadHeroList(); err != nil {
 		return map[string]interface{}{
 			"id":   heroId,
-			"name": getHeroNameFallback(heroId),
+			"name": fmt.Sprintf("未知英雄(%d)", heroId),
 			"type": "unknown",
 		}
 	}
 
 	if hero, exists := heroMap[heroId]; exists {
-		// 将英雄类型转换为文字
 		heroTypeText := getHeroTypeText(hero.HeroType)
-
 		return map[string]interface{}{
 			"id":       heroId,
 			"name":     hero.Cname,
@@ -109,12 +82,12 @@ func (a *App) GetHeroInfo(heroId int) map[string]interface{} {
 
 	return map[string]interface{}{
 		"id":   heroId,
-		"name": getHeroNameFallback(heroId),
+		"name": fmt.Sprintf("未知英雄(%d)", heroId),
 		"type": "unknown",
 	}
 }
 
-// 6. 英雄类型映射
+// 5. 英雄类型映射
 func getHeroTypeText(heroType int) string {
 	typeMap := map[int]string{
 		1: "坦克",

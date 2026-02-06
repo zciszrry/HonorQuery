@@ -1,12 +1,19 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"time"
 )
+
+// 嵌入初始的 saved_players.json 文件
+//
+//go:embed saved_players.json
+var defaultSavedPlayersData []byte
 
 // 1. ID存储结构
 type SavedPlayer struct {
@@ -16,8 +23,73 @@ type SavedPlayer struct {
 	LastUsed int64  `json:"last_used"`
 }
 
+// 获取用户数据目录的路径
+func (a *App) getUserDataPath() string {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		// 如果获取失败，使用当前目录
+		return "."
+	}
+
+	// 创建应用专属目录
+	appDir := filepath.Join(configDir, "王者荣耀战绩查询")
+	os.MkdirAll(appDir, 0755)
+	return appDir
+}
+
+// 获取用户数据文件路径
+func (a *App) getUserDataFilePath() string {
+	return filepath.Join(a.getUserDataPath(), "saved_players.json")
+}
+
+// 初始化用户数据文件（第一次运行时调用）
+func (a *App) initUserDataFile() error {
+	userFilePath := a.getUserDataFilePath()
+
+	// 检查文件是否已存在
+	if _, err := os.Stat(userFilePath); err == nil {
+		// 文件已存在，不需要初始化
+		return nil
+	}
+
+	// 文件不存在，从嵌入数据复制
+	fmt.Printf("🔄 初始化用户数据文件: %s\n", userFilePath)
+
+	// 首先尝试读取嵌入的默认数据
+	if len(defaultSavedPlayersData) > 0 {
+		// 直接复制嵌入数据到用户目录
+		if err := os.WriteFile(userFilePath, defaultSavedPlayersData, 0644); err == nil {
+			fmt.Printf("✅ 已从嵌入数据复制默认玩家列表\n")
+			return nil
+		}
+	}
+
+	// 如果嵌入数据无效或复制失败，创建包含默认数据的文件
+	defaultPlayers := []SavedPlayer{
+		{
+			ID:       "409903972",
+			Nickname: "示例玩家",
+			SaveTime: time.Now().Unix(),
+			LastUsed: time.Now().Unix(),
+		},
+	}
+
+	data, err := json.MarshalIndent(defaultPlayers, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(userFilePath, data, 0644)
+}
+
 // 2. 保存玩家ID
 func (a *App) SavePlayerID(playerID string, nickname string) (bool, error) {
+	// 确保用户数据文件已初始化
+	if err := a.initUserDataFile(); err != nil {
+		fmt.Printf("❌ 初始化用户数据文件失败: %v\n", err)
+		return false, err
+	}
+
 	// 读取现有保存的ID
 	savedPlayers := a.loadSavedPlayers()
 
@@ -45,11 +117,19 @@ func (a *App) SavePlayerID(playerID string, nickname string) (bool, error) {
 
 // 3. 获取所有保存的玩家
 func (a *App) GetSavedPlayers() []SavedPlayer {
+	// 确保用户数据文件已初始化
+	a.initUserDataFile()
 	return a.loadSavedPlayers()
 }
 
 // 4. 删除保存的玩家
 func (a *App) RemoveSavedPlayer(playerID string) bool {
+	// 确保用户数据文件已初始化
+	if err := a.initUserDataFile(); err != nil {
+		fmt.Printf("❌ 初始化用户数据文件失败: %v\n", err)
+		return false
+	}
+
 	savedPlayers := a.loadSavedPlayers()
 	newPlayers := []SavedPlayer{}
 
@@ -62,41 +142,26 @@ func (a *App) RemoveSavedPlayer(playerID string) bool {
 	return a.savePlayersToFile(newPlayers)
 }
 
-// 5. 加载保存的玩家数据
-// 修改 loadSavedPlayers 函数，添加路径信息
+// 5. 加载保存的玩家数据（修改为使用用户数据目录）
 func (a *App) loadSavedPlayers() []SavedPlayer {
-	// 获取当前工作目录
-	cwd, _ := os.Getwd()
-	fmt.Printf("📁 当前工作目录: %s\n", cwd)
+	userFilePath := a.getUserDataFilePath()
 
-	// 尝试多个可能的路径
-	possiblePaths := []string{
-		"saved_players.json",
-		"./saved_players.json",
-		"data/saved_players.json",
-		"./data/saved_players.json",
+	data, err := os.ReadFile(userFilePath)
+	if err != nil {
+		fmt.Printf("❌ 读取用户数据文件失败: %v\n", err)
+		return []SavedPlayer{}
 	}
 
-	for _, path := range possiblePaths {
-		fmt.Printf("🔍 尝试读取: %s\n", path)
-		data, err := os.ReadFile(path)
-		if err == nil {
-			fmt.Printf("✅ 从 %s 读取成功\n", path)
-			var players []SavedPlayer
-			if err := json.Unmarshal(data, &players); err != nil {
-				fmt.Printf("❌ 解析保存文件失败: %v\n", err)
-				return []SavedPlayer{}
-			}
-			fmt.Printf("📊 加载了 %d 个玩家\n", len(players))
-			return players
-		}
+	var players []SavedPlayer
+	if err := json.Unmarshal(data, &players); err != nil {
+		fmt.Printf("❌ 解析用户数据文件失败: %v\n", err)
+		return []SavedPlayer{}
 	}
 
-	fmt.Println("⚠️ 没有找到保存文件，返回空数组")
-	return []SavedPlayer{}
+	return players
 }
 
-// 6. 保存到文件
+// 6. 保存到文件（修改为保存到用户数据目录）
 func (a *App) savePlayersToFile(players []SavedPlayer) bool {
 	// 按最后使用时间排序
 	sort.Slice(players, func(i, j int) bool {
@@ -109,9 +174,10 @@ func (a *App) savePlayersToFile(players []SavedPlayer) bool {
 		return false
 	}
 
-	err = os.WriteFile("saved_players.json", data, 0644)
+	userFilePath := a.getUserDataFilePath()
+	err = os.WriteFile(userFilePath, data, 0644)
 	if err != nil {
-		fmt.Printf("❌ 写入保存文件失败: %v\n", err)
+		fmt.Printf("❌ 写入用户数据文件失败: %v\n", err)
 		return false
 	}
 
