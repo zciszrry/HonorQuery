@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -37,6 +40,8 @@ type BattleRecord struct {
 	HeroIcon    string `json:"heroIcon"`
 	RoleJobName string `json:"roleJobName"`
 	Stars       int    `json:"stars"`
+	GameSeq     string `json:"gameSeq"`
+	BattleType  int    `json:"battleType"`
 }
 
 // NewApp 创建应用实例
@@ -52,106 +57,184 @@ func (a *App) startup(ctx context.Context) {
 // ================ 核心 API 函数 ================
 
 // QueryBattleData 查询战绩数据（前端调用）
-func (a *App) QueryBattleData(apiKey string, playerID string, mode string) (map[string]interface{}, error) {
-	// 添加调试信息
-	fmt.Printf("🔍 开始查询 - 玩家ID: %s, 模式: %s\n", playerID, mode)
-
-	// 构建URL
-	url := fmt.Sprintf("https://api.t1qq.com/api/tool/wzrr/morebattle?key=%s&id=%s&option=%s",
-		apiKey, playerID, mode)
-
-	fmt.Printf("🌐 请求URL: %s\n", url)
-
-	// 发送请求
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(url)
-	if err != nil {
-		errorMsg := fmt.Sprintf("网络请求失败: %v", err)
-		fmt.Println("❌", errorMsg)
-		return map[string]interface{}{
-			"success": false,
-			"message": errorMsg,
-			"debug":   map[string]interface{}{"url": url, "error": err.Error()},
-		}, nil
-	}
-	defer resp.Body.Close()
-
-	fmt.Printf("✅ HTTP状态码: %d\n", resp.StatusCode)
-
-	// 读取响应体（先读出来查看）
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		errorMsg := fmt.Sprintf("读取响应失败: %v", err)
-		fmt.Println("❌", errorMsg)
-		return map[string]interface{}{
-			"success": false,
-			"message": errorMsg,
-		}, nil
+// 保持原函数名，更新实现为五分类
+func (a *App) QueryBattleData(apiKey string, playerID string, category string) (map[string]interface{}, error) {
+	// 五分类映射（修正版）
+	categoryMap := map[string][]string{
+		"1": {"0"},                           // 1.全部
+		"2": {"1", "16"},                     // 2.排位（只包含纯排位）
+		"3": {"4"},                           // 3.巅峰
+		"4": {"2", "7", "3", "5", "6", "17"}, // 4.匹配（排除排位，实测option=2和7包含非排位）
+		"5": {"8", "9", "10"},                // 5.房间
 	}
 
-	// 打印原始响应（调试用）
-	fmt.Printf("📄 原始响应: %s\n", string(bodyBytes[:min(500, len(bodyBytes))]))
-
-	// 解析JSON
-	var result BattleResponse
-	err = json.Unmarshal(bodyBytes, &result)
-	if err != nil {
-		errorMsg := fmt.Sprintf("JSON解析失败: %v", err)
-		fmt.Println("❌", errorMsg)
-		return map[string]interface{}{
-			"success":     false,
-			"message":     errorMsg,
-			"rawResponse": string(bodyBytes),
-		}, nil
+	// 获取对应模式列表
+	modes := categoryMap["1"]
+	if m, exists := categoryMap[category]; exists {
+		modes = m
 	}
 
-	fmt.Printf("📊 API返回: code=%d, msg=%s, 记录数=%d\n",
-		result.Code, result.Msg, len(result.Data.List))
+	fmt.Printf("🔍 查询分类: %s → 模式: %v\n", category, modes)
 
-	// 检查API状态
-	if result.Code != 200 {
-		errorMsg := fmt.Sprintf("API错误: %s (code: %d)", result.Msg, result.Code)
-		fmt.Println("❌", errorMsg)
+	// 使用Set去重（基于游戏序列号gameSeq）
+	seenGames := make(map[string]bool)
+	allRecords := []BattleRecord{}
+
+	// 并发获取所有模式数据
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, mode := range modes {
+		wg.Add(1)
+		go func(modeStr string) {
+			defer wg.Done()
+
+			url := fmt.Sprintf("https://api.t1qq.com/api/tool/wzrr/morebattle?key=%s&id=%s&option=%s",
+				apiKey, playerID, modeStr)
+
+			client := &http.Client{Timeout: 30 * time.Second}
+			resp, err := client.Get(url)
+			if err != nil {
+				fmt.Printf("❌ 模式 %s 查询失败: %v\n", modeStr, err)
+				return
+			}
+			defer resp.Body.Close()
+
+			// 读取响应
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Printf("❌ 模式 %s 读取失败: %v\n", modeStr, err)
+				return
+			}
+
+			var result BattleResponse
+			if err := json.Unmarshal(bodyBytes, &result); err != nil {
+				fmt.Printf("❌ 模式 %s 解析失败: %v\n", modeStr, err)
+				return
+			}
+
+			if result.Code == 200 {
+				mu.Lock()
+				// 去重逻辑
+				for _, record := range result.Data.List {
+					// 使用gameSeq作为唯一标识
+					if record.GameSeq != "" {
+						if !seenGames[record.GameSeq] {
+							seenGames[record.GameSeq] = true
+							// 修正：根据模式值过滤排位数据
+							// 如果当前是匹配模式，但record是排位，跳过
+							if category == "4" && isRankedGame(record) {
+								continue
+							}
+							if category == "4" && isTopGame(record) {
+								continue
+							}
+							allRecords = append(allRecords, record)
+						}
+					} else {
+						// 没有gameSeq时用时间+英雄ID作为备用标识
+						key := fmt.Sprintf("%s-%d", record.DtEventTime, record.HeroId)
+						if !seenGames[key] {
+							seenGames[key] = true
+							if category == "4" && isRankedGame(record) {
+								continue
+							}
+							if category == "4" && isTopGame(record) {
+								continue
+							}
+							allRecords = append(allRecords, record)
+						}
+					}
+				}
+				mu.Unlock()
+				fmt.Printf("✅ 模式 %s 获取到 %d 条记录（去重后新增%d条）\n",
+					modeStr, len(result.Data.List), len(result.Data.List))
+			} else {
+				fmt.Printf("⚠️ 模式 %s API错误: %s\n", modeStr, result.Msg)
+			}
+		}(mode)
+	}
+
+	wg.Wait()
+
+	// 按时间倒序排序
+	sort.Slice(allRecords, func(i, j int) bool {
+		return allRecords[i].DtEventTime > allRecords[j].DtEventTime
+	})
+
+	fmt.Printf("🎯 总计获取 %d 条记录（已去重）\n", len(allRecords))
+
+	// 修复：允许空数据
+	if len(allRecords) == 0 {
 		return map[string]interface{}{
-			"success": false,
-			"message": errorMsg,
-			"code":    result.Code,
+			"success":  true,
+			"category": category,
+			"total":    0,
+			"summary": map[string]interface{}{
+				"totalGames": 0,
+				"winRate":    "0%",
+				"avgKDA":     "0/0/0",
+				"totalWins":  0,
+				"totalLoss":  0,
+			},
+			"recentGames": []interface{}{},
+			"message":     fmt.Sprintf("该玩家在%s模式下暂无战绩记录", getCategoryName(category)),
 		}, nil
 	}
 
 	// 分析数据
-	records := result.Data.List
-	summary := analyzeSummary(records)
-	recentGames := getRecentGames(records, 10)
+	summary := analyzeSummary(allRecords)
+	recentGames := getRecentGames(allRecords, len(allRecords))
 
-	fmt.Printf("🎯 分析完成: 总场次=%d, 胜率=%s\n",
-		summary["totalGames"].(int), summary["winRate"])
-
-	// 返回给前端的数据
 	return map[string]interface{}{
 		"success":     true,
-		"total":       len(records),
+		"category":    category,
+		"total":       len(allRecords),
 		"summary":     summary,
 		"recentGames": recentGames,
-		"allRecords":  records,
-		"debug":       map[string]interface{}{"apiCode": result.Code, "apiMsg": result.Msg},
+		"modesCount":  len(modes),
 	}, nil
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+// 判断是否为排位赛
+func isRankedGame(record BattleRecord) bool {
+	// 根据原始API返回的battleType或mapName判断
+	return record.MapName == "排位赛" ||
+		strings.Contains(record.MapName, "排位") ||
+		record.BattleType == 12 || // 双排
+		record.BattleType == 13 || // 三排
+		record.BattleType == 15 || // 五排
+		record.BattleType == 16 // 单排
 }
 
-// analyzeSummary 分析总结数据
+// 判断是否为巅峰赛
+func isTopGame(record BattleRecord) bool {
+	// 根据原始API返回的battleType或mapName判断
+	return record.MapName == "巅峰赛" ||
+		strings.Contains(record.MapName, "巅峰")
+}
+
+// 获取分类名称
+func getCategoryName(category string) string {
+	names := map[string]string{
+		"1": "全部比赛",
+		"2": "排位赛",
+		"3": "巅峰赛",
+		"4": "匹配模式",
+		"5": "房间模式",
+	}
+	return names[category]
+}
+
+// 修正analyzeSummary函数，处理空数据
 func analyzeSummary(records []BattleRecord) map[string]interface{} {
 	if len(records) == 0 {
 		return map[string]interface{}{
 			"totalGames": 0,
-			"winRate":    0,
+			"winRate":    "0%",
 			"avgKDA":     "0/0/0",
+			"totalWins":  0,
+			"totalLoss":  0,
 		}
 	}
 
@@ -180,6 +263,24 @@ func analyzeSummary(records []BattleRecord) map[string]interface{} {
 		"totalWins":  wins,
 		"totalLoss":  total - wins,
 	}
+}
+
+// 更新GetGameModes返回五分类选项
+func (a *App) GetGameModes() []map[string]interface{} {
+	return []map[string]interface{}{
+		{"value": "1", "label": "全部比赛"},
+		{"value": "2", "label": "排位赛"},
+		{"value": "3", "label": "巅峰赛"},
+		{"value": "4", "label": "匹配模式"},
+		{"value": "5", "label": "房间模式"},
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // getRecentGames 获取最近比赛
@@ -218,39 +319,79 @@ func getRecentGames(records []BattleRecord, count int) []map[string]interface{} 
 	return recent
 }
 
-// getHeroName 获取英雄名称
-func getHeroName(heroId int) string {
-	heroMap := map[int]string{
-		505: "瑶",
-		155: "马可波罗",
-		196: "诸葛亮",
-		119: "干将莫邪",
-		184: "蔡文姬",
-		503: "海月",
-		117: "钟无艳",
+// 新增函数：五分类查询
+func (a *App) GetBattleData(apiKey string, playerID string, category string) (map[string]interface{}, error) {
+	// 五分类映射
+	categoryMap := map[string][]string{
+		"1": {"0"},                           // 1.全部
+		"2": {"1", "16"},                     // 2.排位：5v5排位 + 10v10排位
+		"3": {"4"},                           // 3.巅峰：巅峰赛
+		"4": {"2", "3", "5", "6", "7", "17"}, // 4.匹配：标准+娱乐+五军+边境+5v5+10v10
+		"5": {"8", "9", "10"},                // 5.房间：3v3 + 1v1 + 战队赛
 	}
 
-	if name, exists := heroMap[heroId]; exists {
-		return name
+	// 默认查询全部
+	modes := categoryMap["1"]
+	if m, exists := categoryMap[category]; exists {
+		modes = m
 	}
-	return fmt.Sprintf("未知英雄(%d)", heroId)
+
+	// 获取所有数据
+	allRecords := []BattleRecord{}
+	for _, mode := range modes {
+		url := fmt.Sprintf("https://api.t1qq.com/api/tool/wzrr/morebattle?key=%s&id=%s&option=%s",
+			apiKey, playerID, mode)
+
+		// 发送请求并解析
+		records, err := a.fetchBattleData(url)
+		if err == nil {
+			allRecords = append(allRecords, records...)
+		}
+	}
+
+	// 分析数据
+	summary := analyzeSummary(allRecords)
+	recentGames := getRecentGames(allRecords, len(allRecords))
+
+	return map[string]interface{}{
+		"success":     true,
+		"category":    category,
+		"total":       len(allRecords),
+		"summary":     summary,
+		"recentGames": recentGames,
+		"modesCount":  len(modes), // 包含几个mode
+	}, nil
 }
 
-// 获取模式选项（供前端使用）
-func (a *App) GetGameModes() []map[string]interface{} {
+// 新增：五分类选项
+func (a *App) GetCategoryOptions() []map[string]interface{} {
 	return []map[string]interface{}{
-		{"value": "0", "label": "全部比赛"},
-		{"value": "1", "label": "5v5排位赛"},
-		{"value": "16", "label": "10v10排位赛"},
-		{"value": "2", "label": "5v5标准模式"},
-		{"value": "17", "label": "10v10标准模式"},
-		{"value": "3", "label": "娱乐模式"},
-		{"value": "4", "label": "巅峰赛"},
-		{"value": "5", "label": "五军对决"},
-		{"value": "6", "label": "边境突围"},
-		{"value": "7", "label": "5v5"},
-		{"value": "8", "label": "3v3"},
-		{"value": "9", "label": "1v1"},
-		{"value": "10", "label": "战队赛"},
+		{"value": "1", "label": "全部比赛"},
+		{"value": "2", "label": "排位赛"},
+		{"value": "3", "label": "巅峰赛"},
+		{"value": "4", "label": "匹配模式"},
+		{"value": "5", "label": "房间模式"},
 	}
+}
+
+// 辅助函数：获取单模式数据
+func (a *App) fetchBattleData(url string) ([]BattleRecord, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result BattleResponse
+	decoder := json.NewDecoder(resp.Body)
+	if err := decoder.Decode(&result); err != nil {
+		return nil, err
+	}
+
+	if result.Code != 200 {
+		return nil, fmt.Errorf("API错误: %s", result.Msg)
+	}
+
+	return result.Data.List, nil
 }

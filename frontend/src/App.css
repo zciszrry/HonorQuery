@@ -499,3 +499,538 @@ body {
         padding: 20px;
     }
 }
+
+/* 空数据状态 */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.empty-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    color: #cbd5e1;
+}
+
+.empty-state h3 {
+    margin-bottom: 10px;
+    color: #64748b;
+}
+
+.empty-state p {
+    color: #94a3b8;
+    margin-bottom: 20px;
+}
+
+.stats-info {
+    background: #f1f5f9;
+    padding: 10px 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+    font-weight: 500;
+    color: #475569;
+}
+
+.empty-tips {
+    text-align: left;
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 20px;
+    border-left: 4px solid #3b82f6;
+}
+
+.empty-tips p {
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.empty-tips ul {
+    list-style: none;
+    padding-left: 20px;
+    margin: 0;
+}
+
+.empty-tips li {
+    padding: 5px 0;
+    color: #64748b;
+    position: relative;
+}
+
+.empty-tips li:before {
+    content: "•";
+    color: #3b82f6;
+    font-weight: bold;
+    position: absolute;
+    left: -15px;
+}
+
+/* 无比赛记录 */
+.no-games-message {
+    text-align: center;
+    padding: 30px;
+    background: white;
+    border-radius: 15px;
+    margin-top: 20px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.no-games-icon {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    color: #cbd5e1;
+}
+
+.no-games-message h3 {
+    margin-bottom: 10px;
+    color: #64748b;
+}
+
+.no-games-message p {
+    color: #94a3b8;
+}
+
+/* 分类信息 */
+.category-info {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 10px;
+}
+
+.category-info h4 {
+    margin-bottom: 15px;
+    color: #475569;
+}
+
+.category-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.category-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+}
+
+.category-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.category-name {
+    font-weight: 600;
+    color: #475569;
+    min-width: 60px;
+}
+
+.category-desc {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+/* 加载遮罩 */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-content {
+    text-align: center;
+    background: white;
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid #e2e8f0;
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    animation: spin 1s linear infinite;
+}
+
+.loading-content p {
+    margin-bottom: 10px;
+    color: #475569;
+    font-weight: 500;
+}
+
+.loading-detail {
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+/* 页脚样式增强 */
+.footer-content {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.footer-note {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-top: 5px;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .empty-state {
+        padding: 30px 15px;
+    }
+
+    .empty-icon {
+        font-size: 2.5rem;
+    }
+
+    .category-list {
+        flex-direction: column;
+    }
+
+    .loading-content {
+        padding: 30px 20px;
+        margin: 20px;
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+    }
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 保存选择区域 */
+.save-select-section {
+    background: white;
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e1e5e9;
+}
+
+/* 调整查询面板位置 */
+.query-panel {
+    margin-top: 0;
+}
+/* 保存选择区域 */
+.save-select-section {
+    background: white;
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border: 1px solid #e1e5e9;
+}
+
+.save-select-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.save-id-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.save-id-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.save-id-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.save-id-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.save-hint {
+    font-size: 12px;
+    color: #666;
+    text-align: center;
+}
+
+.select-saved-container {
+    flex: 1;
+}
+
+.saved-players-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+.saved-players-select:focus {
+    border-color: #667eea;
+    outline: none;
+}
+
+.saved-players-select:disabled {
+    background: #f8f9fa;
+    cursor: not-allowed;
+}
+
+/* 保存的玩家列表 */
+.saved-players-list {
+    border-top: 1px solid #e1e5e9;
+    padding-top: 15px;
+}
+
+.saved-players-header {
+    margin-bottom: 10px;
+    font-weight: 600;
+    color: #555;
+    font-size: 14px;
+}
+
+.saved-players-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.saved-player-item {
+    background: #f8f9fa;
+    border: 1px solid #e1e5e9;
+    border-radius: 6px;
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 150px;
+    max-width: 200px;
+}
+
+.saved-player-item:hover {
+    background: #e7f3ff;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+}
+
+.saved-player-item.active {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    border-left: 3px solid #3b82f6;
+}
+
+.player-main {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.player-nickname {
+    display: block;
+    font-weight: 500;
+    color: #333;
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.player-id {
+    display: block;
+    color: #666;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    margin-top: 2px;
+}
+
+.remove-player-btn {
+    background: none;
+    border: none;
+    color: #ef4444;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+    opacity: 0.6;
+    transition: all 0.2s;
+    margin-left: 5px;
+}
+
+.remove-player-btn:hover {
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+/* 保存弹窗样式 */
+.save-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.save-modal-content {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    animation: modalSlideIn 0.3s ease;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.save-modal-content h3 {
+    margin: 0 0 15px 0;
+    color: #333;
+}
+
+.save-modal-content p {
+    margin: 0 0 20px 0;
+    color: #666;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.save-input-group {
+    margin-bottom: 20px;
+}
+
+.save-input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #555;
+}
+
+.save-input-group input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 2px solid #e1e5e9;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.save-input-group input:focus {
+    border-color: #667eea;
+    outline: none;
+}
+
+.save-modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.save-cancel-btn {
+    padding: 8px 16px;
+    border: 1px solid #e1e5e9;
+    background: white;
+    color: #666;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.save-cancel-btn:hover {
+    background: #f8f9fa;
+}
+
+.save-confirm-btn {
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.save-confirm-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.save-confirm-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .save-select-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .save-id-button {
+        width: 100%;
+    }
+
+    .saved-player-item {
+        max-width: 100%;
+    }
+
+    .saved-players-items {
+        flex-direction: column;
+    }
+}
